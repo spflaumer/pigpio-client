@@ -120,24 +120,23 @@ const CMDS = {
   EVT:    116,
   PROCU:  117
 }
-exports.Commands = CMDS
+export const Commands = CMDS
 
-exports.extReqCmdSet = new Set("WVCHA, WVAG, SLRO, WVAS, HP, \
+export const extReqCmdSet = new Set("WVCHA, WVAG, SLRO, WVAS, HP, \
 TRIG, PROC, PROCR, I2CO, I2CWD, I2CWB, I2CWW, I2CRI, I2CWI, I2CPC, I2CPK, I2CWK, \
 SPIO, SPIW, SPIX, SERO, SERW, CF1, CF2, BI2CO, BI2CZ, I2CZ, FN, FO, FW, FS, FL, \
 SHELL, BSPIO, BSPIX, BSCX, PROCU".split(', ').map(i=> CMDS[i]))
 
-exports.extResCmdSet = new Set("SLR, PROCP, I2CRD, I2CRI, I2CPK, SPIR, SPIX, \
+export const extResCmdSet = new Set("SLR, PROCP, I2CRD, I2CRI, I2CPK, SPIR, SPIX, \
 SERR, CF2, BI2CZ, I2CZ, FR, FL, BSPIX, BSCX".split(', ').map(i=> CMDS[i]))
 
 var apiNames = {}
 Object.entries(CMDS).forEach( ([key, val]) => {
   apiNames[val] = key
 })
-exports.APInames = apiNames
+export const APInames = apiNames
 
-/* pigpio constants */
-exports.Constants = {
+export const Constants = {
   PUD_OFF: 0,
   PUD_DOWN: 1,
   PUD_UP: 2,
@@ -147,8 +146,7 @@ exports.Constants = {
   PI_WAVE_MODE_REPEAT_SYNC: 3
 }
 
-/* Error messages */
-exports.PigpioErrors = {
+export const PigpioErrors = {
 '-1': {message: 'gpioInitialise failed', code: 'PI_INIT_FAILED'},
 '-2': {message: 'GPIO not 0-31', code: 'PI_BAD_USER_GPIO'},
 '-3': {message: 'GPIO not 0-53', code: 'PI_BAD_GPIO'},

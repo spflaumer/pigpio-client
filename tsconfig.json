@@ -1,11 +1,12 @@
 {
   "include": ["**/*.js"],
   "exclude": ["**/*.d.ts"],
+  "typeRoots": ["types/"],
   "compilerOptions": {
     "allowJs": true,
     "declaration": true,
     "emitDeclarationOnly": true,
-    "outDir": "types/",
+    "declarationDir": "types/",
     "declarationMap": true
   }
 }

@@ -7,6 +7,7 @@ import EventEmitter from 'events'
 class MyEmitter extends EventEmitter {}
 import { inherits } from 'util'
 import { APInames, PigpioErrors, Commands, extReqCmdSet as _extReqCmdSet, extResCmdSet as _extResCmdSet, Constants } from './SIF.js'
+import * as net from 'net';
 const API = APInames
 const ERR = PigpioErrors
 
@@ -52,7 +53,7 @@ var log = function(...args) {
 export function pigpio (pi) {
   var requestQueue = []
   var callbackQueue = []
-  const net = require('net')
+
   // update info
   if (typeof pi === 'undefined') pi = {}
   info.host = pi.host || info.host
@@ -1163,8 +1164,9 @@ export function pigpio (pi) {
   return that
 }// pigpio constructor
 
-class MyError {
+class MyError extends Error {
     constructor(settings, context) {
+        super()
         settings = settings || {}
         if (typeof settings === 'string')
             settings = { message: settings }
@@ -1175,4 +1177,3 @@ class MyError {
         Error.captureStackTrace(this, context || MyError)
     }
 }
-inherits(MyError, Error)
