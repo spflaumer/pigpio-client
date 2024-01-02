@@ -707,3 +707,4 @@ declare namespace CMDS {
 }
 declare var apiNames: {};
 export { CMDS as Commands, apiNames as APInames };
+//# sourceMappingURL=SIF.d.ts.map

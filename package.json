@@ -9,11 +9,13 @@
   "devDependencies": {
     "debug": "^4.1.0",
     "lorem-ipsum": "^1.0.4",
-    "nested-error-stacks": "^2.1.0"
+    "nested-error-stacks": "^2.1.0",
+    "typescript": "^5.3.3"
   },
   "scripts": {
     "test": "node ./test/regression.js",
-    "usage": "node ./examples/usage_promises.js"
+    "usage": "node ./examples/usage_promises.js",
+    "types": "npx -p typescript tsc"
   },
   "config": {
     "host": "192.168.100.6",
@@ -41,6 +43,5 @@
     "type": "git",
     "url": "https://github.com/guymcswain/pigpio-client.git"
   },
-  "bugs": "https://github.com/guymcswain/pigpio-client/issues",
-  "dependencies": {}
+  "bugs": "https://github.com/guymcswain/pigpio-client/issues"
 }
