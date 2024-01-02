@@ -2,33 +2,33 @@
  Construct a pigpio client object that connects with a remote pigpio
  server (pigpiod) and allows manipulation of its gpio pins.
  */
-const assert = require('assert')
-const EventEmitter = require('events')
+import assert, { equal } from 'assert'
+import EventEmitter from 'events'
 class MyEmitter extends EventEmitter {}
-const util = require('util')
-const SIF = require('./SIF.js')
-const API = SIF.APInames
-const ERR = SIF.PigpioErrors
+import { inherits } from 'util'
+import { APInames, PigpioErrors, Commands, extReqCmdSet as _extReqCmdSet, extResCmdSet as _extResCmdSet, Constants } from './SIF.js'
+const API = APInames
+const ERR = PigpioErrors
 
 // These commands are currently supported by pigpio-client:
 const { BR1, BR2, TICK, HWVER, PIGPV, PUD, MODES, MODEG, READ, WRITE, PWM, WVCLR,
 WVCRE, WVBSY, WVAG, WVCHA, NOIB, NB, NP, NC, SLRO, SLR, SLRC, SLRI, WVTXM, WVTAT,
 WVHLT, WVDEL, WVAS, HP, HC, GDC, PFS, FG, SERVO, GPW, TRIG,
 I2CO, I2CC, I2CRD, I2CWD, BSCX, EVM
-} = SIF.Commands
+} = Commands
 
 // These command types can not fail, ie, always return p3/res as positive integer
 const canNeverFailCmdSet = new Set([HWVER, PIGPV, BR1, BR2, TICK])
 
 // These command types have extended command arguments
-const extReqCmdSet = SIF.extReqCmdSet
+const extReqCmdSet = _extReqCmdSet
 
 // These command types have extended response arguments
-const extResCmdSet = SIF.extResCmdSet
+const extResCmdSet = _extResCmdSet
 
 /* pigpio constants */
 const {PUD_OFF, PUD_DOWN, PUD_UP, PI_WAVE_MODE_ONE_SHOT, PI_WAVE_MODE_REPEAT,
-PI_WAVE_MODE_ONE_SHOT_SYNC, PI_WAVE_MODE_REPEAT_SYNC} = SIF.Constants
+PI_WAVE_MODE_ONE_SHOT_SYNC, PI_WAVE_MODE_REPEAT_SYNC} = Constants
 
 var info = {
   host: 'localhost',
@@ -49,7 +49,7 @@ var log = function(...args) {
   }
 }
 /*****************************************************************************/
-exports.pigpio = function (pi) {
+export function pigpio (pi) {
   var requestQueue = []
   var callbackQueue = []
   const net = require('net')
@@ -323,14 +323,14 @@ exports.pigpio = function (pi) {
     }
 
     if (process.env.PIGPIO) {
-      let b = resBuf.slice(0, 16).toJSON().data
+      let b = resBuf.subarray(0, 16).toJSON().data
       console.log('response= ', ...b)
       if (extLen > 0) {
-        let bx = resBuf.slice(16).toJSON().data
+        let bx = resBuf.subarray(16).toJSON().data
         console.log('extended params= ', ...bx)
       }
     }
-    resBuf = resBuf.slice(extLen + 16) // leave remainder for later processing
+    resBuf = resBuf.subarray(extLen + 16) // leave remainder for later processing
     // process the response callback
     var callback = callbackQueue.shift() // FIXME: test for queue underflow
     if (typeof callback === 'function') callback(error, p3[0], ...res)
@@ -390,10 +390,10 @@ exports.pigpio = function (pi) {
       commandSocket.write(buf)
       callbackQueue.push(cb)
       if (process.env.PIGPIO) {
-        let b = buf.slice(0, 16).toJSON().data // exclude extended params!
+        let b = buf.subarray(0, 16).toJSON().data // exclude extended params!
         console.log('request= ', ...b)
         if (bufSize > 16) {
-          let bx = buf.slice(16).toJSON().data // extended params
+          let bx = buf.subarray(16).toJSON().data // extended params
           console.log('extended params= ', ...bx)
         }
       }
@@ -472,7 +472,7 @@ exports.pigpio = function (pi) {
     }
     var buf = Buffer.concat([chunklet, chunk])
     let remainder = buf.length % 12
-    chunklet = buf.slice(buf.length-remainder)
+    chunklet = buf.subarray(buf.length-remainder)
 
     // skip if buf is a fragment
     if (buf.length / 12 > 0) {
@@ -674,250 +674,252 @@ exports.pigpio = function (pi) {
 
   that.gpio = function (gpio) {
     
-    var _gpio = function (gpio) {
-      assert(typeof gpio === 'number' && isUserGpio(gpio),
-          "Argument 'gpio' is not a user GPIO.")
-      var modeSet = function (gpio, mode, callback) {
-        assert(typeof mode === 'string', "Argument 'mode' must be string.")
-        let m = /^outp?u?t?/.test(mode) ? 1 : /^inp?u?t?/.test(mode) ? 0 : undefined
-        assert(m !== undefined, "Argument 'mode' is not a valid string.")
-        return request(MODES, gpio, m, 0, callback)
-      }
+    class _gpio {
+          constructor(gpio) {
+              assert(typeof gpio === 'number' && isUserGpio(gpio),
+                  "Argument 'gpio' is not a user GPIO.")
+              var modeSet = function(gpio, mode, callback) {
+                  assert(typeof mode === 'string', "Argument 'mode' must be string.")
+                  let m = /^outp?u?t?/.test(mode) ? 1 : /^inp?u?t?/.test(mode) ? 0 : undefined
+                  assert(m !== undefined, "Argument 'mode' is not a valid string.")
+                  return request(MODES, gpio, m, 0, callback)
+              }
 
-      var pullUpDown = function (gpio, pud, callback) {
-        assert(typeof pud === 'number', "Argument 'pud' is not a number.")
-      // Rely on pigpio library to range check pud argument.
-        return request(PUD, gpio, pud, 0, callback)
-      }
+              var pullUpDown = function(gpio, pud, callback) {
+                  assert(typeof pud === 'number', "Argument 'pud' is not a number.")
+                  // Rely on pigpio library to range check pud argument.
+                  return request(PUD, gpio, pud, 0, callback)
+              }
 
-  // basic methods
-      this.modeSet = function (...args) { modeSet(gpio, ...args) }
-      this.pullUpDown = function (...args) { pullUpDown(gpio, ...args) }
-      this.write = function (level, callback) {
-        assert(typeof level === 'number' && (level === 0 || level === 1),
-          "Argument 'level' must be numeric 0 or 1")
-        //if ((+level >= 0) && (+level <= 1)) {
-          return request(WRITE, gpio, +level, 0, callback)
-        //} else throw new MyError('gpio.write level argument must be numeric 0 or 1')
-      }
-      this.read = function (callback) {
-        return request(READ, gpio, 0, 0, callback)
-      }
-      this.modeGet = function (callback) {
-        return request(MODEG, gpio, 0, 0, callback)
-      }
-      this.trigger = function (len, level, callback) {
-        const buf = Buffer.allocUnsafe(4);
-        buf.writeUInt32LE(level);
-        return request(TRIG, gpio, len, 4, callback, buf);
-      }
-  // PWM
-      this.analogWrite = function (dutyCycle, cb) {
-        return request(PWM, gpio, dutyCycle, 0, cb)
-      }
-  // Notification methods
-      var notifierID = null
+              // basic methods
+              this.modeSet = function(...args) { modeSet(gpio, ...args) }
+              this.pullUpDown = function(...args) { pullUpDown(gpio, ...args) }
+              this.write = function(level, callback) {
+                  assert(typeof level === 'number' && (level === 0 || level === 1),
+                      "Argument 'level' must be numeric 0 or 1")
+                  //if ((+level >= 0) && (+level <= 1)) {
+                  return request(WRITE, gpio, +level, 0, callback)
+                  //} else throw new MyError('gpio.write level argument must be numeric 0 or 1')
+              }
+              this.read = function(callback) {
+                  return request(READ, gpio, 0, 0, callback)
+              }
+              this.modeGet = function(callback) {
+                  return request(MODEG, gpio, 0, 0, callback)
+              }
+              this.trigger = function(len, level, callback) {
+                  const buf = Buffer.allocUnsafe(4)
+                  buf.writeUInt32LE(level)
+                  return request(TRIG, gpio, len, 4, callback, buf)
+              }
+              // PWM
+              this.analogWrite = function(dutyCycle, cb) {
+                  return request(PWM, gpio, dutyCycle, 0, cb)
+              }
+              // Notification methods
+              var notifierID = null
 
-      this.notify = function (callback) {
-      // only allow one notifier per gpio object
-        if (notifierID !== null) {
-          that.emit('error', new MyError('Notifier already registered for this gpio.'))
-          return
-        }
+              this.notify = function(callback) {
+                  // only allow one notifier per gpio object
+                  if (notifierID !== null) {
+                      that.emit('error', new MyError('Notifier already registered for this gpio.'))
+                      return
+                  }
 
-        let gpioBitValue = 1 << gpio
-        notifierID = that.startNotifications(gpioBitValue, (levels, tick) => {
-        // When notifications are ended, last callback has null arguments
-          if (levels === null) {
-            return callback(null, null)
+                  let gpioBitValue = 1 << gpio
+                  notifierID = that.startNotifications(gpioBitValue, (levels, tick) => {
+                      // When notifications are ended, last callback has null arguments
+                      if (levels === null) {
+                          return callback(null, null)
+                      }
+                      let level = (gpioBitValue & levels) >> gpio
+                      callback(level, tick)
+                  })
+              }
+              this.endNotify = function(cb) {
+                  if (notifierID !== null) {
+                      that.stopNotifications(notifierID, (err, res) => {
+                          notifierID = null
+                          if (cb && typeof cb === 'function')
+                              cb(err, res)
+                          else if (err)
+                              that.emit('error', new MyError(err))
+                      })
+                  }
+              }
+              // glitch
+              this.glitchSet = function(steady, callback) {
+                  assert(typeof steady === 'number' && steady >= 0 && steady <= 300000,
+                      "Argument 'steady' must be a numeric bewtween 0 or 300000")
+                  return request(FG, gpio, steady, 0, callback)
+              }
+
+              // Waveform generation methods
+              this.waveClear = function(callback) {
+                  return request(WVCLR, 0, 0, 0, callback)
+              }
+              this.waveCreate = function(callback) {
+                  return request(WVCRE, 0, 0, 0, callback)
+              }
+              this.waveBusy = function(callback) {
+                  return request(WVBSY, 0, 0, 0, callback)
+              }
+              this.waveNotBusy = function(time, cb) {
+                  let timer, callback
+
+                  if (typeof time !== 'number') {
+                      timer = 25
+                      callback = time
+                  } else {
+                      timer = time
+                      callback = cb
+                  }
+                  var promise = new Promise(function(resolve) {
+                      let originalCallback = callback
+                      callback = function() {
+                          if (typeof originalCallback === 'function') {
+                              originalCallback()
+                          }
+                          resolve()
+                      }
+                  })
+                  var waitWaveBusy = (done) => {
+                      setTimeout(() => {
+                          request(WVBSY, 0, 0, 0, (err, busy) => {
+                              if (!busy) done()
+                              else waitWaveBusy(done)
+                          })
+                      }, timer)
+                  }
+                  waitWaveBusy(callback)
+                  return promise
+              }
+
+              this.waveAddPulse = function(tripletArr, callback) {
+                  // test triplets is an array of arrays
+                  tripletArr.forEach(function(triplet) {
+                      equal((Object.prototype.toString.apply(triplet)), '[object Array]', 'tripletArr not an array')
+                      equal(triplet.length, 3, 'triplet array length is not 3')
+                  })
+
+                  // use Typed Arrays
+                  var arrBuf = new ArrayBuffer(tripletArr.length * 3 * 4) // items are 3 x 32-bit values
+                  var uint32Triplet = new Uint32Array(arrBuf, 0, tripletArr.length * 3) // 32-bit view of buffer
+                  let i = 0
+                  tripletArr.forEach(function(triplet) {
+                      uint32Triplet[i + 0] = triplet[0] << gpio // 'set' gpio (bit value)
+                      uint32Triplet[i + 1] = triplet[1] << gpio // 'clear' gpio (bit value)
+                      uint32Triplet[i + 2] = triplet[2]
+                      i = i + 3
+                  })
+                  // ship it
+                  return request(WVAG, 0, 0, arrBuf.byteLength, callback, arrBuf)
+              }
+
+              this.waveChainTx = function(paramArray, callback) {
+                  // Todo: assert paramArray elements are single property objects
+                  var chain = []
+                  paramArray.forEach((param) => {
+                      let temp
+                      if (param.hasOwnProperty('loop')) {
+                          temp = chain.concat(255, 0)
+                      } else if (param.hasOwnProperty('repeat')) {
+                          if (param.repeat === true) {
+                              temp = chain.concat(255, 3)
+                          } else {
+                              equal(param.repeat <= 0xffff, true, 'param must be <= 65535')
+                              temp = chain.concat(255, 1, param.repeat & 0xff, param.repeat >> 8)
+                          }
+                      } else if (param.hasOwnProperty('delay')) {
+                          equal(param.delay <= 0xffff, true, 'param must be <= 65535')
+                          temp = chain.concat(255, 2, param.delay & 0xff, param.delay >> 8)
+                      } else if (param.hasOwnProperty('waves')) {
+                          param.waves.forEach((wid) => {
+                              equal(wid <= 250, true, 'wid must be <= 250')
+                          })
+                          temp = chain.concat(param.waves)
+                      }
+                      chain = temp
+                      temp = []
+                  })
+
+                  var arrBuf = new ArrayBuffer(chain.length)
+                  var buffer = new Uint8Array(arrBuf)
+                  for (let i = 0; i < chain.length; i++) buffer[i] = chain[i]
+                  return request(WVCHA, 0, 0, arrBuf.byteLength, callback, arrBuf)
+              }
+
+              this.waveTxStop = function(cb) {
+                  return request(WVHLT, 0, 0, 0, cb)
+              }
+              this.waveSendSync = function(wid, cb) {
+                  return request(WVTXM, wid, PI_WAVE_MODE_ONE_SHOT_SYNC, 0, cb)
+              }
+              this.waveSendOnce = function(wid, cb) {
+                  return request(WVTXM, wid, PI_WAVE_MODE_ONE_SHOT, 0, cb)
+              }
+              this.waveTxAt = function(cb) {
+                  return request(WVTAT, 0, 0, 0, cb)
+              }
+              this.waveDelete = function(wid, cb) {
+                  return request(WVDEL, wid, 0, 0, cb)
+              }
+
+              // Pulse Width Modulation
+              this.setPWMdutyCycle = function(dutyCycle, cb) {
+                  return request(PWM, gpio, dutyCycle, 0, cb)
+              }
+              this.setPWMfrequency = function(freq, cb) {
+                  return request(PFS, gpio, freq, 0, cb)
+              }
+              this.getPWMdutyCycle = function(cb) {
+                  return request(GDC, gpio, 0, 0, cb)
+              }
+              this.hardwarePWM = function(frequency, dutyCycle, callback) {
+                  var arrBuf = new ArrayBuffer(4)
+                  var dcBuf = new Uint32Array(arrBuf, 0, 1)
+                  dcBuf[0] = dutyCycle
+                  return request(HP, gpio, frequency, 4, callback, arrBuf)
+              }
+
+              // Servo pulse width
+              this.setServoPulsewidth = function(pulseWidth, cb) {
+                  return request(SERVO, gpio, pulseWidth, 0, cb)
+              }
+              this.getServoPulsewidth = function(cb) {
+                  return request(GPW, gpio, 0, 0, cb)
+              }
+
+              // Bit-Bang Serial IO
+              this.serialReadOpen = function(baudRate, dataBits, callback) {
+                  var arrBuf = new ArrayBuffer(4)
+                  var dataBitsBuf = new Uint32Array(arrBuf, 0, 1)
+                  dataBitsBuf[0] = dataBits
+                  return request(SLRO, gpio, baudRate, 4, callback, arrBuf)
+              }
+              this.serialRead = function(count, callback) {
+                  return request(SLR, gpio, count, 0, callback)
+              }
+              this.serialReadClose = function(callback) {
+                  return request(SLRC, gpio, 0, 0, callback)
+              }
+              this.serialReadInvert = function(mode, callback) {
+                  var flag
+                  if (mode === 'invert') flag = 1
+                  if (mode === 'normal') flag = 0
+                  assert(typeof flag !== 'undefined', "Argument 'mode' is invalid.")
+                  return request(SLRI, gpio, flag, 0, callback)
+              }
+              this.waveAddSerial = function(baud, bits, delay, data, callback) {
+                  let dataBuf = Buffer.from(data)
+                  let paramBuf = Buffer.from(Uint32Array.from([bits, 2, delay]).buffer)
+                  let buf = Buffer.concat([paramBuf, dataBuf])
+                  // request take array buffer (this conversion from ZachB on SO)
+                  // let arrBuf = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+                  return request(WVAS, gpio, baud, buf.length, callback, buf)
+              }
           }
-          let level = (gpioBitValue & levels) >> gpio
-          callback(level, tick)
-        })
-      }
-      this.endNotify = function (cb) {
-        if (notifierID !== null) {
-          that.stopNotifications(notifierID, (err, res) => {
-            notifierID = null
-            if (cb && typeof cb === 'function')
-              cb(err, res)
-            else if (err)
-              that.emit('error', new MyError(err))
-          })
-        }
-      }
-  // glitch
-      this.glitchSet = function (steady, callback) {
-        assert(typeof steady === 'number' && steady >= 0 && steady <= 300000,
-          "Argument 'steady' must be a numeric bewtween 0 or 300000")
-        return request(FG, gpio, steady, 0, callback)
-      }
-
-  // Waveform generation methods
-      this.waveClear = function (callback) {
-        return request(WVCLR, 0, 0, 0, callback)
-      }
-      this.waveCreate = function (callback) {
-        return request(WVCRE, 0, 0, 0, callback)
-      }
-      this.waveBusy = function (callback) {
-        return request(WVBSY, 0, 0, 0, callback)
-      }
-      this.waveNotBusy = function (time, cb) {
-        let timer, callback
-
-        if (typeof time !== 'number') {
-          timer = 25
-          callback = time
-        } else {
-          timer = time
-          callback = cb
-        }
-        var promise = new Promise(function(resolve) {
-          let originalCallback = callback
-          callback = function() {
-            if (typeof originalCallback === 'function') {
-              originalCallback()
-            }
-            resolve()
-          }
-        })
-        var waitWaveBusy = (done) => {
-          setTimeout(() => {
-            request(WVBSY, 0, 0, 0, (err, busy) => {
-              if (!busy) done()
-              else waitWaveBusy(done)
-            })
-          }, timer)
-        }
-        waitWaveBusy(callback)
-        return promise
-      }
-
-      this.waveAddPulse = function (tripletArr, callback) {
-      // test triplets is an array of arrays
-        tripletArr.forEach(function (triplet) {
-          assert.equal((Object.prototype.toString.apply(triplet)), '[object Array]', 'tripletArr not an array')
-          assert.equal(triplet.length, 3, 'triplet array length is not 3')
-        })
-
-      // use Typed Arrays
-        var arrBuf = new ArrayBuffer(tripletArr.length * 3 * 4)  // items are 3 x 32-bit values
-        var uint32Triplet = new Uint32Array(arrBuf, 0, tripletArr.length * 3)  // 32-bit view of buffer
-        let i = 0
-        tripletArr.forEach(function (triplet) {
-          uint32Triplet[i + 0] = triplet[0] << gpio // 'set' gpio (bit value)
-          uint32Triplet[i + 1] = triplet[1] << gpio // 'clear' gpio (bit value)
-          uint32Triplet[i + 2] = triplet[2]
-          i = i + 3
-        })
-      // ship it
-        return request(WVAG, 0, 0, arrBuf.byteLength, callback, arrBuf)
-      }
-
-      this.waveChainTx = function (paramArray, callback) {
-      // Todo: assert paramArray elements are single property objects
-        var chain = []
-        paramArray.forEach((param) => {
-          let temp
-          if (param.hasOwnProperty('loop')) {
-            temp = chain.concat(255, 0)
-          } else if (param.hasOwnProperty('repeat')) {
-            if (param.repeat === true) {
-              temp = chain.concat(255, 3)            
-            } else {
-              assert.equal(param.repeat <= 0xffff, true, 'param must be <= 65535')
-              temp = chain.concat(255, 1, param.repeat & 0xff, param.repeat >> 8)
-            }
-          } else if (param.hasOwnProperty('delay')) {
-            assert.equal(param.delay <= 0xffff, true, 'param must be <= 65535')
-            temp = chain.concat(255, 2, param.delay & 0xff, param.delay >> 8)
-          } else if (param.hasOwnProperty('waves')) {
-            param.waves.forEach((wid) => {
-              assert.equal(wid <= 250, true, 'wid must be <= 250')
-            })
-            temp = chain.concat(param.waves)
-          }
-          chain = temp
-          temp = []
-        })
-
-        var arrBuf = new ArrayBuffer(chain.length)
-        var buffer = new Uint8Array(arrBuf)
-        for (let i = 0; i < chain.length; i++) buffer[i] = chain[i]
-        return request(WVCHA, 0, 0, arrBuf.byteLength, callback, arrBuf)
-      }
-
-      this.waveTxStop = function (cb) {
-        return request(WVHLT, 0, 0, 0, cb)
-      }
-      this.waveSendSync = function (wid, cb) {
-        return request(WVTXM, wid, PI_WAVE_MODE_ONE_SHOT_SYNC, 0, cb)
-      }
-      this.waveSendOnce = function (wid, cb) {
-        return request(WVTXM, wid, PI_WAVE_MODE_ONE_SHOT, 0, cb)
-      }
-      this.waveTxAt = function (cb) {
-        return request(WVTAT, 0, 0, 0, cb)
-      }
-      this.waveDelete = function (wid, cb) {
-        return request(WVDEL, wid, 0, 0, cb)
-      }
-
-  // Pulse Width Modulation
-      this.setPWMdutyCycle = function (dutyCycle, cb) { // alias of analogWrite
-        return request(PWM, gpio, dutyCycle, 0, cb)
-      }
-      this.setPWMfrequency = function (freq, cb) {
-        return request(PFS, gpio, freq, 0, cb)
-      }
-      this.getPWMdutyCycle = function (cb) {
-        return request(GDC, gpio, 0, 0, cb)
-      }
-      this.hardwarePWM = function (frequency, dutyCycle, callback) {
-        var arrBuf = new ArrayBuffer(4)
-        var dcBuf = new Uint32Array(arrBuf, 0, 1)
-        dcBuf[0] = dutyCycle
-        return request(HP, gpio, frequency, 4, callback, arrBuf)
-      }
-
-  // Servo pulse width
-      this.setServoPulsewidth = function (pulseWidth, cb) {
-        return request(SERVO, gpio, pulseWidth, 0, cb)
-      }
-      this.getServoPulsewidth = function (cb) {
-        return request(GPW, gpio, 0, 0, cb)
-      }
-
-  // Bit-Bang Serial IO
-      this.serialReadOpen = function (baudRate, dataBits, callback) {
-        var arrBuf = new ArrayBuffer(4)
-        var dataBitsBuf = new Uint32Array(arrBuf, 0, 1)
-        dataBitsBuf[0] = dataBits
-        return request(SLRO, gpio, baudRate, 4, callback, arrBuf)
-      }
-      this.serialRead = function (count, callback) {
-        return request(SLR, gpio, count, 0, callback)
-      }
-      this.serialReadClose = function (callback) {
-        return request(SLRC, gpio, 0, 0, callback)
-      }
-      this.serialReadInvert = function (mode, callback) {
-        var flag
-        if (mode === 'invert') flag = 1
-        if (mode === 'normal') flag = 0
-        assert(typeof flag !== 'undefined', "Argument 'mode' is invalid.")
-        return request(SLRI, gpio, flag, 0, callback)
-      }
-      this.waveAddSerial = function (baud, bits, delay, data, callback) {
-        let dataBuf = Buffer.from(data)
-        let paramBuf = Buffer.from(Uint32Array.from([bits, 2, delay]).buffer)
-        let buf = Buffer.concat([paramBuf, dataBuf])
-      // request take array buffer (this conversion from ZachB on SO)
-      // let arrBuf = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
-        return request(WVAS, gpio, baud, buf.length, callback, buf)
-      }
-    }// var gpio
+      }// var gpio
     _gpio.prototype = that // inheritance
     return new _gpio(gpio)
   }// that.gpio constructor
@@ -932,216 +934,220 @@ exports.pigpio = function (pi) {
  *        - implement duplex stream api
  */
   that.serialport = function (rx, tx, dtr) {
-    var _serialport = function (rx, tx, dtr) {
-      if (dtr)
-        assert(isUserGpio(rx) && isUserGpio(tx) && isUserGpio(dtr),
-        "Arguments 'rx', 'tx', and 'dtr' must be valid user GPIO")
-      else
-        assert(isUserGpio(rx) && isUserGpio(tx),
-        "Arguments 'rx' and 'tx' must be valid user GPIO")
-      
-      var baud, bits, isOpen=false, txBusy=false, maxChars, buffer=''
-      var _rx, _tx, _dtr
-      _rx = new that.gpio(rx)
-      if (tx === rx) { // loopback mode
-        _tx = _rx
-      } else _tx = new that.gpio(tx)
-      if (dtr)
-        _dtr = (dtr === tx) ? _tx : new that.gpio(dtr)
-      _rx.modeSet('input') // need a pullup?
-      _tx.modeSet('output')
-      _tx.write(1)
-      if (dtr) {
-        _dtr.modeSet('output')
-        _dtr.write(1)
-      }
+    class _serialport {
+          constructor(rx, tx, dtr) {
+              if (dtr)
+                  assert(isUserGpio(rx) && isUserGpio(tx) && isUserGpio(dtr),
+                      "Arguments 'rx', 'tx', and 'dtr' must be valid user GPIO")
 
-      this.open = function (baudrate, databits, cb) {
-        if (cb) assert(typeof cb === 'function',
-            "argument 'cb' must be a function")
-        baud = baudrate || 9600
-        assert(typeof baud === 'number', "argument 'baud' must be a number")
-        assert(!isNaN(baud) && baud > 49 && baud < 250001,
-            "argument 'baud' must be a positive number between 50 and 250000")
-        bits = databits || 8
-        assert(typeof bits === 'number', "argument 'dataBits' must be a number")
-        assert(!isNaN(bits) && bits > 0 && bits < 33,
-            "argument 'dataBits' must be a positive number between 1 and 32")
-          
-        // initialize rx
-        _rx.serialReadOpen(baud, bits, (err) => {
-          if (err && err.code === 'PI_GPIO_IN_USE') {
-            log("PI_GPIO_IN_USE, try close then re-open")
-            _rx.serialReadClose((err) => {
-              if (err) {
-                log("something is wrong on retry open serial port")
-                isOpen = false
-                if (cb)
-                  cb(createSPError(err), false)
-                else that.emit(createSPError(err))
+              else
+                  assert(isUserGpio(rx) && isUserGpio(tx),
+                      "Arguments 'rx' and 'tx' must be valid user GPIO")
+
+              var baud, bits, isOpen = false, txBusy = false, maxChars, buffer = ''
+              var _rx, _tx, _dtr
+              _rx = new that.gpio(rx)
+              if (tx === rx) { // loopback mode
+                  _tx = _rx
+              } else _tx = new that.gpio(tx)
+              if (dtr)
+                  _dtr = (dtr === tx) ? _tx : new that.gpio(dtr)
+              _rx.modeSet('input') // need a pullup?
+              _tx.modeSet('output')
+              _tx.write(1)
+              if (dtr) {
+                  _dtr.modeSet('output')
+                  _dtr.write(1)
               }
-              else _rx.serialReadOpen(baud, bits, (err) => {
-                log("retrying open, abort on error")
-                if (err) throw(createSPError(err))
-                log("retry success")
-                isOpen = true
-                if (dtr && dtr !== tx) {
-                  // pulse dtr pin to reset Arduino
-                  _dtr.write(0, () => {
-                    setTimeout(() => { _dtr.write(1) }, 10)
-                  })
-                }
-                if (cb)
-                  cb(null, true)
-              })
-            })
-          } else if (err) { // unexpected error on open
-            isOpen = false
-            if (cb)
-              cb(createSPError(err), false)
-            else that.emit(createSPError(err))
-          } else {
-            // normal success
-            isOpen = true
-            if (dtr && dtr !== tx) {
-              // pulse dtr pin to reset Arduino
-              _dtr.write(0, () => {
-                setTimeout(() => { _dtr.write(1) }, 10)
-              })
-            }
-            if (cb)
-              cb(null, true)
-          }
-        })
-        
-        // initialize tx
-        _tx.waveClear((err) => {
-          if (err) throw(createSPError(err))
-          that.request(35, 2, 0, 0, (err, maxPulses) => {
-            maxChars = maxPulses / (bits + 2)
-            log('maxChars = ', maxChars)
-          })
-        })
-      }
 
-    /*
-     * Read from serialport.  Arguments:
-     *
-     *  size  A number representing the number of bytes to read.  Size is optional.
-     *        If not specified, all the data in the buffer is returned (<=8192).
-     *
-     *  cb    On success, invoked as cb(null, data) where 'data' is a string.
-     *        On failure, invoked as cb(err) where 'err' is a PigpioError
-     *        object.
-    */
-      this.read = function (size, cb) {
-        let count, callb
-        if (typeof size === 'function') {
-          callb = size
-          count = 8192
-        } else {
-          callb = cb
-          count = size || 8192 // must read at least a byte at a time
-        }
-        if (isOpen) {
-          _rx.serialRead(count, (err, len, ...bytes) => {
-            if (err) {
-              callb(createSPError(err))
-            } else if (len === 0) {
-              callb(null, null)
-            } else {
-              let buf = Buffer.from(bytes)
-              callb(null, ""+buf) // coerce to string
-            }
-          })
-        } else callb(null)
-      }
-      
-      this.write = function (data) {
-      /*  Saves data, coerced to utf8 string, to a buffer then sends chunks of
-       *  of size 'maxChars' to waveAddSerial().  Returns the size (>=0) of buffer.
-       *  If the serial port is not open, returns -1.  
-       *  Pigpio errors will be thrown to limit possible data corruption.
-      */
-        if (isOpen === false)
-          return -1
-        
-        buffer += data  // fast concatenation with coercion to string type
-        if (txBusy)
-          return buffer.length
-        
-        let chunk = buffer.slice(0, maxChars) // computed in serialport.open()
-        buffer = buffer.slice(chunk.length)
-        txBusy = true
-        if (chunk) send(chunk)
-        return buffer.length
-        
-        function send(data) {
-          log('serialport sending data ', data.length)
-          _tx.waveAddSerial(baud, bits, 0, data, (err) => {
-            if (err) throw(createSPError(err))
-            _tx.waveCreate( (err, wid)=> {
-              if (err) throw(createSPError(err))
-              _tx.waveSendOnce(wid, (err) => {
-                if (err) throw(createSPError(err))
-                setTimeout(() => {
-                  _tx.waveNotBusy(1, () => {
-                    _tx.waveDelete(wid, (err) => {
-                      if (err) throw(createSPError(err))
-                      if (buffer) {
-                        chunk = buffer.slice(0, maxChars)
-                        buffer = buffer.slice(chunk.length)
-                        send(chunk)
-                      }
-                      else 
-                        txBusy = false
-                    })
-                  })
-                }, Math.ceil((data.length+1) * 10 * 1000 / baud))
-              })
-            })
-          })
-        }
-      }
+              this.open = function(baudrate, databits, cb) {
+                  if (cb) assert(typeof cb === 'function',
+                      "argument 'cb' must be a function")
+                  baud = baudrate || 9600
+                  assert(typeof baud === 'number', "argument 'baud' must be a number")
+                  assert(!isNaN(baud) && baud > 49 && baud < 250001,
+                      "argument 'baud' must be a positive number between 50 and 250000")
+                  bits = databits || 8
+                  assert(typeof bits === 'number', "argument 'dataBits' must be a number")
+                  assert(!isNaN(bits) && bits > 0 && bits < 33,
+                      "argument 'dataBits' must be a positive number between 1 and 32")
 
-      this.close = function (callback) {
-        if (isOpen) {
-          isOpen = false
-          _rx.serialReadClose((err) => {
-            if(err && err.code === 'PI_NOT_SERIAL_GPIO')
-              log('Serial read is already closed: '+err.message)
-            else if (err) if (callback && typeof callback === 'function')
-                               callback(createSPError(err))
+                  // initialize rx
+                  _rx.serialReadOpen(baud, bits, (err) => {
+                      if (err && err.code === 'PI_GPIO_IN_USE') {
+                          log("PI_GPIO_IN_USE, try close then re-open")
+                          _rx.serialReadClose((err) => {
+                              if (err) {
+                                  log("something is wrong on retry open serial port")
+                                  isOpen = false
+                                  if (cb)
+                                      cb(createSPError(err), false)
+                                  else that.emit(createSPError(err))
+                              }
+                              else _rx.serialReadOpen(baud, bits, (err) => {
+                                  log("retrying open, abort on error")
+                                  if (err) throw (createSPError(err))
+                                  log("retry success")
+                                  isOpen = true
+                                  if (dtr && dtr !== tx) {
+                                      // pulse dtr pin to reset Arduino
+                                      _dtr.write(0, () => {
+                                          setTimeout(() => { _dtr.write(1) }, 10)
+                                      })
+                                  }
+                                  if (cb)
+                                      cb(null, true)
+                              })
+                          })
+                      } else if (err) { // unexpected error on open
+                          isOpen = false
+                          if (cb)
+                              cb(createSPError(err), false)
                           else that.emit(createSPError(err))
-          })
-        }
-        if (typeof callback === 'function') callback(null, 0)
-      }
-      this.end = function (callback) {
-        if (callback)
-          assert(typeof callback === 'function', "Argument 'cb' must be a function")
-        this.close((err) => {
-          if (err) if (callback)
-                        callback(createSPError(err))
-                   else that.emit(createSPError(err))
-          _tx.modeSet('in', (err) => {
-            if (err)  if (callback)
-                           callback(createSPError(err))
-                      else that.emit(createSPError(err))
-            if (dtr)
-              _dtr.modeSet('input', (err) => {
-                if (err) if (callback)
+                      } else {
+                          // normal success
+                          isOpen = true
+                          if (dtr && dtr !== tx) {
+                              // pulse dtr pin to reset Arduino
+                              _dtr.write(0, () => {
+                                  setTimeout(() => { _dtr.write(1) }, 10)
+                              })
+                          }
+                          if (cb)
+                              cb(null, true)
+                      }
+                  })
+
+                  // initialize tx
+                  _tx.waveClear((err) => {
+                      if (err) throw (createSPError(err))
+                      that.request(35, 2, 0, 0, (err, maxPulses) => {
+                          maxChars = maxPulses / (bits + 2)
+                          log('maxChars = ', maxChars)
+                      })
+                  })
+              }
+
+              /*
+               * Read from serialport.  Arguments:
+               *
+               *  size  A number representing the number of bytes to read.  Size is optional.
+               *        If not specified, all the data in the buffer is returned (<=8192).
+               *
+               *  cb    On success, invoked as cb(null, data) where 'data' is a string.
+               *        On failure, invoked as cb(err) where 'err' is a PigpioError
+               *        object.
+              */
+              this.read = function(size, cb) {
+                  let count, callb
+                  if (typeof size === 'function') {
+                      callb = size
+                      count = 8192
+                  } else {
+                      callb = cb
+                      count = size || 8192 // must read at least a byte at a time
+                  }
+                  if (isOpen) {
+                      _rx.serialRead(count, (err, len, ...bytes) => {
+                          if (err) {
+                              callb(createSPError(err))
+                          } else if (len === 0) {
+                              callb(null, null)
+                          } else {
+                              let buf = Buffer.from(bytes)
+                              callb(null, "" + buf) // coerce to string
+                          }
+                      })
+                  } else callb(null)
+              }
+
+              this.write = function(data) {
+                  /*  Saves data, coerced to utf8 string, to a buffer then sends chunks of
+                   *  of size 'maxChars' to waveAddSerial().  Returns the size (>=0) of buffer.
+                   *  If the serial port is not open, returns -1.
+                   *  Pigpio errors will be thrown to limit possible data corruption.
+                  */
+                  if (isOpen === false)
+                      return -1
+
+                  buffer += data // fast concatenation with coercion to string type
+                  if (txBusy)
+                      return buffer.length
+
+                  let chunk = buffer.slice(0, maxChars) // computed in serialport.open()
+                  buffer = buffer.slice(chunk.length)
+                  txBusy = true
+                  if (chunk) send(chunk)
+                  return buffer.length
+
+                  function send(data) {
+                      log('serialport sending data ', data.length)
+                      _tx.waveAddSerial(baud, bits, 0, data, (err) => {
+                          if (err) throw (createSPError(err))
+                          _tx.waveCreate((err, wid) => {
+                              if (err) throw (createSPError(err))
+                              _tx.waveSendOnce(wid, (err) => {
+                                  if (err) throw (createSPError(err))
+                                  setTimeout(() => {
+                                      _tx.waveNotBusy(1, () => {
+                                          _tx.waveDelete(wid, (err) => {
+                                              if (err) throw (createSPError(err))
+                                              if (buffer) {
+                                                  chunk = buffer.slice(0, maxChars)
+                                                  buffer = buffer.slice(chunk.length)
+                                                  send(chunk)
+                                              }
+
+                                              else
+                                                  txBusy = false
+                                          })
+                                      })
+                                  }, Math.ceil((data.length + 1) * 10 * 1000 / baud))
+                              })
+                          })
+                      })
+                  }
+              }
+
+              this.close = function(callback) {
+                  if (isOpen) {
+                      isOpen = false
+                      _rx.serialReadClose((err) => {
+                          if (err && err.code === 'PI_NOT_SERIAL_GPIO')
+                              log('Serial read is already closed: ' + err.message)
+                          else if (err) if (callback && typeof callback === 'function')
                               callback(createSPError(err))
-                         else that.emit(createSPError(err))
-                // success, finally!
-                if (callback)
-                  callback()
-              })
-            else if (callback) callback()
-          })
-        })
-      }
-    }// _serialport()
+                          else that.emit(createSPError(err))
+                      })
+                  }
+                  if (typeof callback === 'function') callback(null, 0)
+              }
+              this.end = function(callback) {
+                  if (callback)
+                      assert(typeof callback === 'function', "Argument 'cb' must be a function")
+                  this.close((err) => {
+                      if (err) if (callback)
+                          callback(createSPError(err))
+                      else that.emit(createSPError(err))
+                      _tx.modeSet('in', (err) => {
+                          if (err) if (callback)
+                              callback(createSPError(err))
+                          else that.emit(createSPError(err))
+                          if (dtr)
+                              _dtr.modeSet('input', (err) => {
+                                  if (err) if (callback)
+                                      callback(createSPError(err))
+                                  else that.emit(createSPError(err))
+                                  // success, finally!
+                                  if (callback)
+                                      callback()
+                              })
+                          else if (callback) callback()
+                      })
+                  })
+              }
+          }
+      }// _serialport()
 
     function createSPError(err) {
       return new MyError( { name: 'pigpioClientError',
@@ -1157,14 +1163,16 @@ exports.pigpio = function (pi) {
   return that
 }// pigpio constructor
 
-function MyError(settings, context) {
-  settings = settings || {}
-  if (typeof settings === 'string')
-    settings = {message: settings}
-  this.name = settings.name || "pigpioClientError"
-  this.code = settings.code || "PI_CLIENT"
-  this.message = settings.message || "An error occurred"
-  this.api = settings.api || ""
-  Error.captureStackTrace(this, context || MyError)
+class MyError {
+    constructor(settings, context) {
+        settings = settings || {}
+        if (typeof settings === 'string')
+            settings = { message: settings }
+        this.name = settings.name || "pigpioClientError"
+        this.code = settings.code || "PI_CLIENT"
+        this.message = settings.message || "An error occurred"
+        this.api = settings.api || ""
+        Error.captureStackTrace(this, context || MyError)
+    }
 }
-util.inherits(MyError, Error)
+inherits(MyError, Error)
